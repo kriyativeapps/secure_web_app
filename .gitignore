@@ -2,7 +2,9 @@
 
 
 certs/
+data/
 database.db
+error_reports/
 
 # Python
 __pycache__/
@@ -22,3 +24,4 @@ dist/
 build/
 # Environment variables
 .env
+

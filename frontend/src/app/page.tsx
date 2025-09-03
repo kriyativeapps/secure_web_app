@@ -11,15 +11,27 @@ export default function Home() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [uploadMessage, setUploadMessage] = useState('');
+  const [errorReportUrl, setErrorReportUrl] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
     fetchItems();
   }, []);
 
   const fetchItems = async () => {
-    const response = await fetch('/api/items');
-    const data = await response.json();
-    setItems(data);
+    try {
+      const response = await fetch('/api/items');
+      if (response.ok) {
+        const data = await response.json();
+        setItems(Array.isArray(data) ? data : []);
+      } else {
+        setItems([]);
+      }
+    } catch (error) {
+      setItems([]);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -54,6 +66,37 @@ export default function Home() {
     fetchItems();
   };
 
+  const handleFileUpload = async () => {
+    if (!file) return;
+    setIsUploading(true);
+    setUploadMessage('');
+    setErrorReportUrl('');
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await fetch('/api/upload-items', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setUploadMessage(data.message);
+        if (data.error_report_url) {
+          setErrorReportUrl(data.error_report_url.replace('/reports/', '/api/reports/'));
+        }
+        fetchItems(); // Refresh the list
+      } else {
+        setUploadMessage(data.detail || 'Upload failed');
+      }
+    } catch (error) {
+      setUploadMessage('Upload failed');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">CRUD Items</h1>
@@ -83,6 +126,34 @@ export default function Home() {
               </Button>
             )}
           </form>
+        </CardContent>
+      </Card>
+      <Card className="mb-4">
+        <CardHeader>
+          <CardTitle>Upload Items from File</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <Input
+              type="file"
+              accept=".csv,.xlsx,.xls"
+              onChange={(e) => setFile(e.target.files?.[0] || null)}
+            />
+            <Button onClick={handleFileUpload} disabled={!file || isUploading}>
+              {isUploading ? 'Uploading...' : 'Upload'}
+            </Button>
+            {uploadMessage && (
+              <p className="text-sm text-gray-600">{uploadMessage}</p>
+            )}
+            {errorReportUrl && (
+              <div className="flex items-center space-x-2">
+                <p className="text-sm text-red-600">Errors occurred. Download report:</p>
+                <Button variant="outline" onClick={() => window.open(errorReportUrl)}>
+                  Download Error Report
+                </Button>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
       <div className="grid gap-4">

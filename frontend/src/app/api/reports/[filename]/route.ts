@@ -26,34 +26,29 @@ const agent = new https.Agent({
   rejectUnauthorized: false, // Allow self-signed certs for testing
 });
 
-const BACKEND_URL = `${process.env.BACKEND_URL}/items`;
-
-export async function GET() {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ filename: string }> }) {
   try {
+    const { filename } = await params;
+    const BACKEND_URL = `${process.env.BACKEND_URL}/reports/${filename}`;
+
     const response = await fetch(BACKEND_URL, {
       agent,
     });
-    const data = await response.json();
-    return NextResponse.json(data);
-  } catch (error) {
-    return NextResponse.json({ error: 'Failed to fetch items' }, { status: 500 });
-  }
-}
 
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const response = await fetch(BACKEND_URL, {
-      method: 'POST',
+    if (!response.ok) {
+      return NextResponse.json({ error: 'Report not found' }, { status: 404 });
+    }
+
+    const buffer = await response.arrayBuffer();
+
+    return new NextResponse(buffer, {
+      status: 200,
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'text/csv',
+        'Content-Disposition': `attachment; filename="${filename}"`,
       },
-      body: JSON.stringify(body),
-      agent,
     });
-    const data = await response.json();
-    return NextResponse.json(data, { status: response.status });
   } catch (error) {
-    return NextResponse.json({ error: 'Failed to create item' }, { status: 500 });
+    return NextResponse.json({ error: 'Download failed' }, { status: 500 });
   }
 }
