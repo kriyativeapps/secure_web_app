@@ -36,6 +36,18 @@ openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key -out server.crt -days 
 openssl req -newkey rsa:2048 -keyout client.key -out client.csr -nodes -subj "/CN=client"
 openssl x509 -req -in client.csr -CA ca.crt -CAkey ca.key -out client.crt -days 365
 ```
+### Windows Certificate Generation
+
+On Windows, you can generate the certificates using OpenSSL. First, ensure OpenSSL is installed. You can install it via:
+
+- **Git for Windows** (which includes Git Bash with OpenSSL): Download from https://gitforwindows.org/
+- **Direct download**: From the OpenSSL website at https://slproweb.com/products/Win32OpenSSL.html
+
+**Note**: OpenSSL is required for generating X.509 certificates used in mTLS. Windows' built-in OpenSSH agent service is for SSH key management and cannot be used for X.509 certificate generation.
+
+Once installed, open Command Prompt, PowerShell, or Git Bash and navigate to the `certs/` directory. The commands are identical to the Linux instructions above:
+
+**Note**: Ensure the OpenSSL executable is in your system's PATH. If using Git Bash, the commands work the same as in a Linux terminal.
 
 ## Backend Configuration
 
