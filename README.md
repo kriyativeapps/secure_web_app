@@ -65,6 +65,7 @@ A simple CRUD web application with FastAPI backend, Next.js frontend, mTLS authe
 - CA: ca.crt, ca.key
 - Server: server.crt, server.key
 - Client: client.crt, client.key
+- Certificate paths are configured via environment variables in the root `.env` file with absolute paths
 - The frontend uses the client certificate to authenticate with the backend via API routes.
 
 ## API Endpoints

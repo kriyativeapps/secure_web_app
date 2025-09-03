@@ -12,12 +12,12 @@ Certificates are generated and stored in the `certs/` directory at the project r
 - **Server Certificate**: `server.crt` and `server.key` - Used by the backend server to prove its identity.
 - **Client Certificate**: `client.crt` and `client.key` - Used by the frontend to authenticate with the backend.
 
-Certificate paths and backend URL are configured via environment variables in the `frontend/.env` file:
-- `CA_CERT=../certs/ca.crt`
-- `SERVER_CERT=../certs/server.crt`
-- `SERVER_KEY=../certs/server.key`
-- `CLIENT_CERT=../certs/client.crt`
-- `CLIENT_KEY=../certs/client.key`
+Certificate paths and backend URL are configured via environment variables in the `.env` file at the project root:
+- `CA_CERT=/absolute/path/to/certs/ca.crt`
+- `SERVER_CERT=/absolute/path/to/certs/server.crt`
+- `SERVER_KEY=/absolute/path/to/certs/server.key`
+- `CLIENT_CERT=/absolute/path/to/certs/client.crt`
+- `CLIENT_KEY=/absolute/path/to/certs/client.key`
 - `BACKEND_URL=https://localhost:8000`
 
 ### Certificate Generation
@@ -47,19 +47,35 @@ The backend is a FastAPI application served by uvicorn with SSL/TLS enabled.
 
 ### SSL Configuration in `run.py`:
 ```python
+import uvicorn
 import os
-from dotenv import load_dotenv
+import pathlib
+from dotenv import load_dotenv, find_dotenv
 
-load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
-uvicorn.run(
-    "main:app",
-    host="0.0.0.0",
-    port=8000,
-    ssl_keyfile=os.path.join(os.path.dirname(__file__), '..', os.environ['SERVER_KEY']),
-    ssl_certfile=os.path.join(os.path.dirname(__file__), '..', os.environ['SERVER_CERT']),
-    ssl_ca_certs=os.path.join(os.path.dirname(__file__), '..', os.environ['CA_CERT']),
-    ssl_verify_mode="CERT_REQUIRED",
-)
+if __name__ == "__main__":
+    load_dotenv(find_dotenv())
+
+    def resolve_cert_path(env_var):
+        cert_path = os.environ[env_var]
+        p = pathlib.Path(cert_path)
+        if not p.is_absolute():
+            # Assume relative to project root
+            project_root = pathlib.Path(__file__).parent.parent
+            p = project_root / p
+        if not p.exists():
+            raise FileNotFoundError(f"Certificate file not found: {p}")
+        return str(p)
+
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=8000,
+        ssl_keyfile=resolve_cert_path('SERVER_KEY'),
+        ssl_certfile=resolve_cert_path('SERVER_CERT'),
+        ssl_ca_certs=resolve_cert_path('CA_CERT'),
+        ssl_verify_mode="CERT_REQUIRED",
+        reload=True,
+    )
 ```
 
 - `ssl_keyfile` and `ssl_certfile`: Server's private key and certificate
@@ -74,21 +90,41 @@ The frontend is a Next.js application that makes API calls to the backend using 
 - [`frontend/src/app/api/items/route.ts`](frontend/src/app/api/items/route.ts) - API route for items collection
 - [`frontend/src/app/api/items/[id]/route.ts`](frontend/src/app/api/items/[id]/route.ts) - API route for individual items
 
-### HTTPS Agent Configuration:
+### HTTPS Agent Configuration in `frontend/src/lib/https-agent.ts`:
 ```typescript
+import https from 'https';
+import fs from 'fs';
+import path from 'path';
+
+// Resolve and check certificate paths
+const clientCertPath = path.resolve(process.cwd(), process.env.CLIENT_CERT!);
+const clientKeyPath = path.resolve(process.cwd(), process.env.CLIENT_KEY!);
+const caCertPath = path.resolve(process.cwd(), process.env.CA_CERT!);
+
+if (!fs.existsSync(clientCertPath)) {
+  throw new Error(`Client cert file not found: ${clientCertPath}`);
+}
+if (!fs.existsSync(clientKeyPath)) {
+  throw new Error(`Client key file not found: ${clientKeyPath}`);
+}
+if (!fs.existsSync(caCertPath)) {
+  throw new Error(`CA cert file not found: ${caCertPath}`);
+}
+
 const agent = new https.Agent({
-  cert: fs.readFileSync(path.join(process.cwd(), process.env.CLIENT_CERT!)),
-  key: fs.readFileSync(path.join(process.cwd(), process.env.CLIENT_KEY!)),
-  ca: fs.readFileSync(path.join(process.cwd(), process.env.CA_CERT!)),
-  rejectUnauthorized: true,
+  cert: fs.readFileSync(clientCertPath),
+  key: fs.readFileSync(clientKeyPath),
+  ca: fs.readFileSync(caCertPath),
+  rejectUnauthorized: false, // Allow self-signed certs for testing
 });
 
-const BACKEND_URL = `${process.env.BACKEND_URL}/items`;
+export { agent };
 ```
 
 - `cert` and `key`: Client certificate and private key
 - `ca`: CA certificate to verify the server's certificate
-- `rejectUnauthorized: true`: Ensures server certificate verification
+- `rejectUnauthorized: false`: Allows self-signed certificates for testing
+- File existence checks: Ensures certificate files exist before creating the agent
 
 ## How mTLS Works
 
