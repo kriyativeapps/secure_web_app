@@ -57,13 +57,13 @@ async def proxy_request(request: Request, path: str):
     """Proxy all requests to the backend with mTLS"""
 
     # Build backend URL
-    SYSTEM_API_URL = f"{SYSTEM_API_URL}/{path}"
+    backend_url = f"{SYSTEM_API_URL}/{path}"
 
     # Add query parameters
     if request.url.query:
-        SYSTEM_API_URL += f"?{request.url.query}"
+        backend_url += f"?{request.url.query}"
 
-    logger.info(f"Proxying request: {request.method} {request.url.path} -> {SYSTEM_API_URL}")
+    logger.info(f"Proxying request: {request.method} {request.url.path} -> {backend_url}")
 
     # Get request body
     body = None
@@ -81,7 +81,7 @@ async def proxy_request(request: Request, path: str):
 
     try:
         client = get_backend_client()
-        logger.info(f"Created backend client, attempting connection to {SYSTEM_API_URL}")
+        logger.info(f"Created backend client, attempting connection to {backend_url}")
     except Exception as e:
         logger.error(f"Error creating backend client: {e}")
         raise HTTPException(status_code=500, detail=f"Client configuration error: {str(e)}")
@@ -89,10 +89,10 @@ async def proxy_request(request: Request, path: str):
     async with client:
         try:
             # Make request to backend
-            logger.info(f"Making request to backend: {request.method} {SYSTEM_API_URL}")
+            logger.info(f"Making request to backend: {request.method} {backend_url}")
             response = await client.request(
                 method=request.method,
-                url=SYSTEM_API_URL,
+                url=backend_url,
                 headers=headers,
                 content=body,
             )
