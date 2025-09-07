@@ -3,11 +3,11 @@ import fetch from 'node-fetch';
 import { agent } from '../../../lib/https-agent';
 
 
-const BACKEND_URL = `${process.env.BACKEND_URL}/items`;
+const SYSTEM_API_URL = `${process.env.APP_API_URL}/items`;
 
 export async function GET() {
   try {
-    const response = await fetch(BACKEND_URL, {
+    const response = await fetch(SYSTEM_API_URL, {
       agent,
     });
     const data = await response.json();
@@ -20,7 +20,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const response = await fetch(BACKEND_URL, {
+    const response = await fetch(SYSTEM_API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

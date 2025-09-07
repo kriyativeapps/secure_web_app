@@ -20,9 +20,9 @@ if __name__ == "__main__":
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=8000,
-        ssl_keyfile=resolve_cert_path('SYSTEM_API_KEY'),
-        ssl_certfile=resolve_cert_path('SYSTEM_API_CERT'),
+        port=8001,  # Different port from backend
+        ssl_keyfile=resolve_cert_path('APP_API_KEY'),
+        ssl_certfile=resolve_cert_path('APP_API_CERT'),
         ssl_ca_certs=resolve_cert_path('CA_CERT'),
         reload=True,
     )

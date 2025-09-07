@@ -3,8 +3,8 @@ import fetch from 'node-fetch';
 import { agent } from '../../../lib/https-agent';
 
 
-const BACKEND_URL = process.env.BACKEND_URL || 'https://localhost:8000';
-const UPLOAD_URL = `${BACKEND_URL}/upload-items`;
+const SYSTEM_API_URL = process.env.APP_API_URL || 'https://localhost:8001';
+const UPLOAD_URL = `${SYSTEM_API_URL}/upload-items`;
 
 export async function POST(request: NextRequest) {
   try {

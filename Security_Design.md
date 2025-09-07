@@ -14,11 +14,11 @@ Certificates are generated and stored in the `certs/` directory at the project r
 
 Certificate paths and backend URL are configured via environment variables in the `.env` file at the project root:
 - `CA_CERT=/absolute/path/to/certs/ca.crt`
-- `SERVER_CERT=/absolute/path/to/certs/server.crt`
-- `SERVER_KEY=/absolute/path/to/certs/server.key`
+- `SYSTEM_API_CERT=/absolute/path/to/certs/server.crt`
+- `SYSTEM_API_KEY=/absolute/path/to/certs/server.key`
 - `CLIENT_CERT=/absolute/path/to/certs/client.crt`
 - `CLIENT_KEY=/absolute/path/to/certs/client.key`
-- `BACKEND_URL=https://localhost:8000`
+- `SYSTEM_API_URL=https://localhost:8000`
 
 ### Certificate Generation
 
@@ -82,8 +82,8 @@ if __name__ == "__main__":
         "main:app",
         host="0.0.0.0",
         port=8000,
-        ssl_keyfile=resolve_cert_path('SERVER_KEY'),
-        ssl_certfile=resolve_cert_path('SERVER_CERT'),
+        ssl_keyfile=resolve_cert_path('SYSTEM_API_KEY'),
+        ssl_certfile=resolve_cert_path('SYSTEM_API_CERT'),
         ssl_ca_certs=resolve_cert_path('CA_CERT'),
         ssl_verify_mode="CERT_REQUIRED",
         reload=True,

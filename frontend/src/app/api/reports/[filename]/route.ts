@@ -6,9 +6,9 @@ import { agent } from '../../../../lib/https-agent';
 export async function GET(request: NextRequest, { params }: { params: Promise<{ filename: string }> }) {
   try {
     const { filename } = await params;
-    const BACKEND_URL = `${process.env.BACKEND_URL}/reports/${filename}`;
+    const SYSTEM_API_URL = `${process.env.APP_API_URL}/reports/${filename}`;
 
-    const response = await fetch(BACKEND_URL, {
+    const response = await fetch(SYSTEM_API_URL, {
       agent,
     });
 
