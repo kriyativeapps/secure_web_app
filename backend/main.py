@@ -12,26 +12,26 @@ app = FastAPI()
 
 from fastapi.responses import FileResponse
 
-@app.get("/items", response_model=List[Item])
+@app.get("/system/api/v1/items", response_model=List[Item])
 def read_items(session: Session = Depends(get_session)):
     items = session.exec(select(Item)).all()
     return items
 
-@app.post("/items", response_model=Item)
+@app.post("/system/api/v1/items", response_model=Item)
 def create_item(item: Item, session: Session = Depends(get_session)):
     session.add(item)
     session.commit()
     session.refresh(item)
     return item
 
-@app.get("/items/{item_id}", response_model=Item)
+@app.get("/system/api/v1/items/{item_id}", response_model=Item)
 def read_item(item_id: int, session: Session = Depends(get_session)):
     item = session.get(Item, item_id)
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
     return item
 
-@app.put("/items/{item_id}", response_model=Item)
+@app.put("/system/api/v1/items/{item_id}", response_model=Item)
 def update_item(item_id: int, updated_item: Item, session: Session = Depends(get_session)):
     item = session.get(Item, item_id)
     if not item:
@@ -42,7 +42,7 @@ def update_item(item_id: int, updated_item: Item, session: Session = Depends(get
     session.refresh(item)
     return item
 
-@app.delete("/items/{item_id}")
+@app.delete("/system/api/v1/items/{item_id}")
 def delete_item(item_id: int, session: Session = Depends(get_session)):
     item = session.get(Item, item_id)
     if not item:
@@ -51,7 +51,7 @@ def delete_item(item_id: int, session: Session = Depends(get_session)):
     session.commit()
     return {"message": "Item deleted"}
 
-@app.post("/upload-items")
+@app.post("/system/api/v1/upload-items")
 async def upload_items(file: UploadFile = File(...), session: Session = Depends(get_session)):
     if not file.filename.endswith(('.csv', '.xlsx', '.xls')):
         raise HTTPException(status_code=400, detail="Invalid file type. Only CSV and Excel files are allowed.")
@@ -109,12 +109,12 @@ async def upload_items(file: UploadFile = File(...), session: Session = Depends(
         error_filepath = os.path.join("error_reports", error_filename)
         os.makedirs("error_reports", exist_ok=True)
         error_df.to_csv(error_filepath, index=False)
-        response["error_report_url"] = f"/reports/{error_filename}"
+        response["error_report_url"] = f"/system/api/v1/reports/{error_filename}"
         response["message"] += f" {len(errors)} errors occurred. Download error report."
 
     return response
 
-@app.get("/reports/{filename}")
+@app.get("/system/api/v1/reports/{filename}")
 async def download_error_report(filename: str):
     filepath = os.path.join("error_reports", filename)
     if not os.path.exists(filepath):

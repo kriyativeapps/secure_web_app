@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fetch from 'node-fetch';
 import { agent } from '../../../../lib/https-agent';
+import { ITEMS_URL } from '../../../../lib/api-urls';
 
 
-const SYSTEM_API_URL = `${process.env.APP_API_URL}/items`;
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const response = await fetch(`${SYSTEM_API_URL}/${id}`, {
+    const response = await fetch(`${ITEMS_URL}/${id}`, {
       agent,
     });
     if (!response.ok) {
@@ -25,7 +25,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const { id } = await params;
     const body = await request.json();
-    const response = await fetch(`${SYSTEM_API_URL}/${id}`, {
+    const response = await fetch(`${ITEMS_URL}/${id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -46,7 +46,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const response = await fetch(`${SYSTEM_API_URL}/${id}`, {
+    const response = await fetch(`${ITEMS_URL}/${id}`, {
       method: 'DELETE',
       agent,
     });

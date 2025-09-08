@@ -52,27 +52,16 @@ def get_backend_client():
         timeout=30.0
     )
 
-@app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"])
-async def proxy_request(request: Request, path: str):
-    """Proxy all requests to the backend with mTLS"""
-
-    # Build backend URL
-    backend_url = f"{SYSTEM_API_URL}/{path}"
+async def proxy_to_backend(method: str, path: str, request: Request, body=None):
+    """Helper function to proxy requests to the backend with mTLS"""
+    # Build backend URL with system/api/v1 prefix
+    backend_url = f"{SYSTEM_API_URL}/system/api/v1/{path}"
 
     # Add query parameters
     if request.url.query:
         backend_url += f"?{request.url.query}"
 
-    logger.info(f"Proxying request: {request.method} {request.url.path} -> {backend_url}")
-
-    # Get request body
-    body = None
-    if request.method in ["POST", "PUT", "PATCH"]:
-        try:
-            body = await request.body()
-        except Exception as e:
-            logger.error(f"Error reading request body: {e}")
-            body = None
+    logger.info(f"Proxying request: {method} {request.url.path} -> {backend_url}")
 
     # Prepare headers (exclude host and connection headers)
     headers = dict(request.headers)
@@ -89,9 +78,9 @@ async def proxy_request(request: Request, path: str):
     async with client:
         try:
             # Make request to backend
-            logger.info(f"Making request to backend: {request.method} {backend_url}")
+            logger.info(f"Making request to backend: {method} {backend_url}")
             response = await client.request(
-                method=request.method,
+                method=method,
                 url=backend_url,
                 headers=headers,
                 content=body,
@@ -131,7 +120,41 @@ async def proxy_request(request: Request, path: str):
             logger.error(f"Internal server error: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
-@app.get("/health")
+# Individual routes for items
+@app.get("/app/ui/items")
+async def get_items(request: Request):
+    return await proxy_to_backend("GET", "items", request)
+
+@app.post("/app/ui/items")
+async def create_item(request: Request):
+    body = await request.body()
+    return await proxy_to_backend("POST", "items", request, body)
+
+@app.get("/app/ui/items/{item_id}")
+async def get_item(item_id: int, request: Request):
+    return await proxy_to_backend("GET", f"items/{item_id}", request)
+
+@app.put("/app/ui/items/{item_id}")
+async def update_item(item_id: int, request: Request):
+    body = await request.body()
+    return await proxy_to_backend("PUT", f"items/{item_id}", request, body)
+
+@app.delete("/app/ui/items/{item_id}")
+async def delete_item(item_id: int, request: Request):
+    return await proxy_to_backend("DELETE", f"items/{item_id}", request)
+
+# Route for uploading items
+@app.post("/app/ui/upload-items")
+async def upload_items(request: Request):
+    body = await request.body()
+    return await proxy_to_backend("POST", "upload-items", request, body)
+
+# Route for downloading reports
+@app.get("/app/ui/reports/{filename}")
+async def download_report(filename: str, request: Request):
+    return await proxy_to_backend("GET", f"reports/{filename}", request)
+
+@app.get("/app/ui/health")
 async def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "service": "app-api"}

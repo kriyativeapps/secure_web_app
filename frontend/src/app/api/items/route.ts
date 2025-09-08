@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fetch from 'node-fetch';
 import { agent } from '../../../lib/https-agent';
+import { ITEMS_URL } from '../../../lib/api-urls';
 
 
-const SYSTEM_API_URL = `${process.env.APP_API_URL}/items`;
 
 export async function GET() {
   try {
-    const response = await fetch(SYSTEM_API_URL, {
+    const response = await fetch(ITEMS_URL, {
       agent,
     });
     const data = await response.json();
@@ -20,7 +20,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const response = await fetch(SYSTEM_API_URL, {
+    const response = await fetch(ITEMS_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

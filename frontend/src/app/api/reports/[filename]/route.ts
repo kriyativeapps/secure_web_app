@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fetch from 'node-fetch';
 import { agent } from '../../../../lib/https-agent';
+import { getReportUrl } from '../../../../lib/api-urls';
 
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ filename: string }> }) {
   try {
     const { filename } = await params;
-    const SYSTEM_API_URL = `${process.env.APP_API_URL}/reports/${filename}`;
+    const url = getReportUrl(filename);
 
-    const response = await fetch(SYSTEM_API_URL, {
+    const response = await fetch(url, {
       agent,
     });
 

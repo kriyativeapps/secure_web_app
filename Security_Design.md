@@ -2,7 +2,13 @@
 
 ## Overview
 
-This application implements Mutual TLS (mTLS) for secure communication between the frontend and backend. mTLS ensures that both the client (frontend) and server (backend) authenticate each other using X.509 certificates, providing strong mutual authentication and encrypted communication.
+This application implements a layered architecture with Mutual TLS (mTLS) for secure communication:
+
+- **Frontend (Next.js)**: Makes API calls to the App-API
+- **App-API (FastAPI Proxy)**: Receives requests on `/app/ui/*` paths and proxies them to the System-API
+- **System-API (FastAPI Backend)**: Provides the core API on `/system/api/v1/*` paths with mTLS enforcement
+
+mTLS ensures that both the App-API and System-API authenticate each other using X.509 certificates, providing strong mutual authentication and encrypted communication.
 
 ## Certificate Management
 
@@ -54,7 +60,7 @@ Once installed, open Command Prompt, PowerShell, or Git Bash and navigate to the
 The backend is a FastAPI application served by uvicorn with SSL/TLS enabled.
 
 ### Key Files:
-- [`backend/main.py`](backend/main.py) - FastAPI application with API routes
+- [`backend/main.py`](backend/main.py) - FastAPI application with API routes prefixed at `/system/api/v1/*`
 - [`backend/run.py`](backend/run.py) - Server startup configuration
 
 ### SSL Configuration in `run.py`:
@@ -96,11 +102,13 @@ if __name__ == "__main__":
 
 ## Frontend Configuration
 
-The frontend is a Next.js application that makes API calls to the backend using client certificates.
+The frontend is a Next.js application that makes API calls to the App-API proxy using SSL. The App-API then proxies requests to the System-API using mTLS.
 
 ### Key Files:
-- [`frontend/src/app/api/items/route.ts`](frontend/src/app/api/items/route.ts) - API route for items collection
-- [`frontend/src/app/api/items/[id]/route.ts`](frontend/src/app/api/items/[id]/route.ts) - API route for individual items
+- [`frontend/src/app/api/items/route.ts`](frontend/src/app/api/items/route.ts) - API route for items collection (calls `/app/ui/items`)
+- [`frontend/src/app/api/items/[id]/route.ts`](frontend/src/app/api/items/[id]/route.ts) - API route for individual items (calls `/app/ui/items/{id}`)
+- [`frontend/src/app/api/upload-items/route.ts`](frontend/src/app/api/upload-items/route.ts) - API route for uploading items (calls `/app/ui/upload-items`)
+- [`frontend/src/app/api/reports/[filename]/route.ts`](frontend/src/app/api/reports/[filename]/route.ts) - API route for downloading reports (calls `/app/ui/reports/{filename}`)
 
 ### HTTPS Agent Configuration in `frontend/src/lib/https-agent.ts`:
 ```typescript
@@ -156,11 +164,19 @@ export { agent };
 
 ## Running the Application
 
-### Backend
+### System-API (Backend)
 ```bash
 cd backend
 python run.py
 ```
+Runs on `https://localhost:8000` with mTLS, serving API endpoints at `/system/api/v1/*`
+
+### App-API (Proxy)
+```bash
+cd app-api
+python run.py
+```
+Runs on `https://localhost:8001` with SSL, serving API endpoints at `/app/ui/*` and proxying to System-API
 
 ### Frontend
 ```bash
@@ -168,7 +184,7 @@ cd frontend
 npm run dev
 ```
 
-The frontend will be available at `http://localhost:3000` and will proxy API requests to `https://localhost:8000` using mTLS.
+The frontend will be available at `http://localhost:3000` and will make API requests to `https://localhost:8001/app/ui/*` over SSL. The App-API proxies these requests to `https://localhost:8000/system/api/v1/*` using mTLS.
 
 ## Troubleshooting
 

@@ -12,8 +12,8 @@ A simple CRUD web application with FastAPI backend, Next.js frontend, layered AP
 └─────────────────┘            └─────────────────┘            └─────────────────┘
 ```
 
-- **System-API (Backend)**: FastAPI with SQLModel, SQLite, mTLS enforcement
-- **App-API**: FastAPI proxy layer providing SSL-secured API gateway
+- **System-API (Backend)**: FastAPI with SQLModel, SQLite, mTLS enforcement, API paths prefixed with `/system/api/v1`
+- **App-API**: FastAPI proxy layer providing SSL-secured API gateway, API paths prefixed with `/app/ui`
 - **UI App (Frontend)**: Next.js with Shadcn UI, TailwindCSS
 - **Security**: SSL between UI and App-API, mTLS between App-API and System-API
 - **Database**: SQLite for data storage
@@ -65,7 +65,7 @@ A simple CRUD web application with FastAPI backend, Next.js frontend, layered AP
     source .venv/bin/activate
     python run.py
     ```
-    The system-api will run on https://localhost:8000 with mTLS enforcement.
+    The system-api will run on https://localhost:8000/system/api/v1/* with mTLS enforcement.
 
 2. **Start App-API** (in another terminal):
     ```bash
@@ -73,7 +73,7 @@ A simple CRUD web application with FastAPI backend, Next.js frontend, layered AP
     source .venv/bin/activate
     python run.py
     ```
-    The app-api will run on https://localhost:8001 with SSL.
+    The app-api will run on https://localhost:8001/app/ui/* with SSL.
 
 3. **Start Frontend** (in another terminal):
     ```bash
@@ -97,11 +97,24 @@ A simple CRUD web application with FastAPI backend, Next.js frontend, layered AP
 
 ## API Endpoints
 
-- GET /api/items - List all items
-- POST /api/items - Create new item
-- GET /api/items/{id} - Get item by ID
-- PUT /api/items/{id} - Update item
-- DELETE /api/items/{id} - Delete item
+### App-API Endpoints (accessed by frontend)
+- GET /app/ui/items - List all items
+- POST /app/ui/items - Create new item
+- GET /app/ui/items/{id} - Get item by ID
+- PUT /app/ui/items/{id} - Update item
+- DELETE /app/ui/items/{id} - Delete item
+- POST /app/ui/upload-items - Upload items from CSV/Excel
+- GET /app/ui/reports/{filename} - Download error reports
+- GET /app/ui/health - Health check
+
+### System-API Endpoints (internal, proxied by App-API)
+- GET /system/api/v1/items - List all items
+- POST /system/api/v1/items - Create new item
+- GET /system/api/v1/items/{id} - Get item by ID
+- PUT /system/api/v1/items/{id} - Update item
+- DELETE /system/api/v1/items/{id} - Delete item
+- POST /system/api/v1/upload-items - Upload items from CSV/Excel
+- GET /system/api/v1/reports/{filename} - Download error reports
 
 ## Notes
 
