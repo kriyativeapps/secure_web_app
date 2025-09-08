@@ -14,17 +14,21 @@ mTLS ensures that both the App-API and System-API authenticate each other using 
 
 Certificates are generated and stored in the `certs/` directory at the project root:
 
-- **CA Certificate**: `ca.crt` and `ca.key` - The Certificate Authority used to sign both server and client certificates.
-- **Server Certificate**: `server.crt` and `server.key` - Used by the backend server to prove its identity.
-- **Client Certificate**: `client.crt` and `client.key` - Used by the frontend to authenticate with the backend.
+- **CA Certificate**: `ca.crt` and `ca.key` - The Certificate Authority used to sign all certificates.
+- **System-API Server Certificate**: `server.crt` and `server.key` - Used by the System-API server to prove its identity.
+- **App-API Server Certificate**: `app-api.crt` and `app-api.key` - Used by the App-API server for SSL communication with the frontend.
+- **Client Certificate**: `client.crt` and `client.key` - Used by the App-API to authenticate with the System-API via mTLS.
 
-Certificate paths and backend URL are configured via environment variables in the `.env` file at the project root:
+Certificate paths and API URLs are configured via environment variables in the `.env` file at the project root:
 - `CA_CERT=/absolute/path/to/certs/ca.crt`
 - `SYSTEM_API_CERT=/absolute/path/to/certs/server.crt`
 - `SYSTEM_API_KEY=/absolute/path/to/certs/server.key`
+- `APP_API_CERT=/absolute/path/to/certs/app-api.crt`
+- `APP_API_KEY=/absolute/path/to/certs/app-api.key`
 - `CLIENT_CERT=/absolute/path/to/certs/client.crt`
 - `CLIENT_KEY=/absolute/path/to/certs/client.key`
 - `SYSTEM_API_URL=https://localhost:8000`
+- `APP_API_URL=https://localhost:8001`
 
 ### Certificate Generation
 
@@ -37,6 +41,10 @@ openssl req -x509 -newkey rsa:4096 -keyout ca.key -out ca.crt -days 365 -nodes -
 # Generate server certificate
 openssl req -newkey rsa:2048 -keyout server.key -out server.csr -nodes -subj "/CN=localhost"
 openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key -out server.crt -days 365 -CAcreateserial
+
+# Generate app-api certificate
+openssl req -newkey rsa:2048 -keyout app-api.key -out app-api.csr -nodes -subj "/CN=localhost"
+openssl x509 -req -in app-api.csr -CA ca.crt -CAkey ca.key -out app-api.crt -days 365 -CAcreateserial
 
 # Generate client certificate
 openssl req -newkey rsa:2048 -keyout client.key -out client.csr -nodes -subj "/CN=client"
@@ -105,6 +113,7 @@ if __name__ == "__main__":
 The frontend is a Next.js application that makes API calls to the App-API proxy using SSL. The App-API then proxies requests to the System-API using mTLS.
 
 ### Key Files:
+- [`frontend/src/lib/api-urls.ts`](frontend/src/lib/api-urls.ts) - Centralized API URL constants and utilities
 - [`frontend/src/app/api/items/route.ts`](frontend/src/app/api/items/route.ts) - API route for items collection (calls `/app/ui/items`)
 - [`frontend/src/app/api/items/[id]/route.ts`](frontend/src/app/api/items/[id]/route.ts) - API route for individual items (calls `/app/ui/items/{id}`)
 - [`frontend/src/app/api/upload-items/route.ts`](frontend/src/app/api/upload-items/route.ts) - API route for uploading items (calls `/app/ui/upload-items`)
@@ -167,16 +176,18 @@ export { agent };
 ### System-API (Backend)
 ```bash
 cd backend
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 python run.py
 ```
-Runs on `https://localhost:8000` with mTLS, serving API endpoints at `/system/api/v1/*`
+The system-api will run on `https://localhost:8000/system/api/v1/*` with mTLS enforcement.
 
 ### App-API (Proxy)
 ```bash
 cd app-api
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 python run.py
 ```
-Runs on `https://localhost:8001` with SSL, serving API endpoints at `/app/ui/*` and proxying to System-API
+The app-api will run on `https://localhost:8001/app/ui/*` with SSL.
 
 ### Frontend
 ```bash
@@ -184,7 +195,7 @@ cd frontend
 npm run dev
 ```
 
-The frontend will be available at `http://localhost:3000` and will make API requests to `https://localhost:8001/app/ui/*` over SSL. The App-API proxies these requests to `https://localhost:8000/system/api/v1/*` using mTLS.
+The frontend will run on `http://localhost:3000` and will make API requests to `https://localhost:8001/app/ui/*` over SSL. The App-API proxies these requests to `https://localhost:8000/system/api/v1/*` using mTLS.
 
 ## Troubleshooting
 
