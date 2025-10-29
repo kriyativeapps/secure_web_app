@@ -6,6 +6,7 @@ import pathlib
 from dotenv import load_dotenv, find_dotenv
 import json
 import logging
+import psutil
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -15,6 +16,23 @@ app = FastAPI(title="Application API", description="API Gateway for Secure CRUD 
 
 # Load environment variables
 load_dotenv(find_dotenv())
+
+# CPU usage threshold for rate limiting
+CPU_THRESHOLD = 80  # 80%
+
+@app.middleware("http")
+async def cpu_based_rate_limiter(request: Request, call_next):
+    # Get CPU usage. The 'interval' parameter is important.
+    cpu_percent = psutil.cpu_percent(interval=None)
+
+    if cpu_percent > CPU_THRESHOLD:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Too Many Requests - CPU usage is at {cpu_percent}%",
+        )
+
+    response = await call_next(request)
+    return response
 
 # Backend URL
 SYSTEM_API_URL = os.environ.get('SYSTEM_API_URL', 'https://localhost:8000')

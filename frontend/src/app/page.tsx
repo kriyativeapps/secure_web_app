@@ -15,6 +15,7 @@ export default function Home() {
   const [uploadMessage, setUploadMessage] = useState('');
   const [errorReportUrl, setErrorReportUrl] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  const [rateLimitMessage, setRateLimitMessage] = useState('');
 
   useEffect(() => {
     fetchItems();
@@ -26,6 +27,11 @@ export default function Home() {
       if (response.ok) {
         const data = await response.json();
         setItems(Array.isArray(data) ? data : []);
+        setRateLimitMessage(''); // Clear any previous rate limit message
+      } else if (response.status === 429) {
+        const errorData = await response.json().catch(() => ({}));
+        setRateLimitMessage(errorData.detail || 'Too Many Requests - Server is busy');
+        setItems([]);
       } else {
         setItems([]);
       }
@@ -36,23 +42,36 @@ export default function Home() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingId) {
-      await fetch(`/api/items/${editingId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, description }),
-      });
-      setEditingId(null);
-    } else {
-      await fetch('/api/items', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, description }),
-      });
+    try {
+      let response;
+      if (editingId) {
+        response = await fetch(`/api/items/${editingId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, description }),
+        });
+      } else {
+        response = await fetch('/api/items', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, description }),
+        });
+      }
+
+      if (response.status === 429) {
+        const errorData = await response.json().catch(() => ({}));
+        setRateLimitMessage(errorData.detail || 'Too Many Requests - Server is busy');
+      } else {
+        setEditingId(null);
+        setName('');
+        setDescription('');
+        setRateLimitMessage(''); // Clear any previous rate limit message
+        fetchItems();
+      }
+    } catch (error) {
+      // Handle network errors
+      setRateLimitMessage('Network error occurred');
     }
-    setName('');
-    setDescription('');
-    fetchItems();
   };
 
   const handleEdit = (item: Item) => {
@@ -62,8 +81,18 @@ export default function Home() {
   };
 
   const handleDelete = async (id: number) => {
-    await fetch(`/api/items/${id}`, { method: 'DELETE' });
-    fetchItems();
+    try {
+      const response = await fetch(`/api/items/${id}`, { method: 'DELETE' });
+      if (response.status === 429) {
+        const errorData = await response.json().catch(() => ({}));
+        setRateLimitMessage(errorData.detail || 'Too Many Requests - Server is busy');
+      } else {
+        setRateLimitMessage(''); // Clear any previous rate limit message
+        fetchItems();
+      }
+    } catch (error) {
+      setRateLimitMessage('Network error occurred');
+    }
   };
 
   const handleFileUpload = async () => {
@@ -71,6 +100,7 @@ export default function Home() {
     setIsUploading(true);
     setUploadMessage('');
     setErrorReportUrl('');
+    setRateLimitMessage('');
 
     const formData = new FormData();
     formData.append('file', file);
@@ -80,15 +110,20 @@ export default function Home() {
         method: 'POST',
         body: formData,
       });
-      const data = await response.json();
-      if (response.ok) {
-        setUploadMessage(data.message);
-        if (data.error_report_url) {
-          setErrorReportUrl(data.error_report_url.replace('/reports/', '/api/reports/'));
-        }
-        fetchItems(); // Refresh the list
+      if (response.status === 429) {
+        const errorData = await response.json().catch(() => ({}));
+        setRateLimitMessage(errorData.detail || 'Too Many Requests - Server is busy');
       } else {
-        setUploadMessage(data.detail || 'Upload failed');
+        const data = await response.json();
+        if (response.ok) {
+          setUploadMessage(data.message);
+          if (data.error_report_url) {
+            setErrorReportUrl(data.error_report_url.replace('/reports/', '/api/reports/'));
+          }
+          fetchItems(); // Refresh the list
+        } else {
+          setUploadMessage(data.detail || 'Upload failed');
+        }
       }
     } catch (error) {
       setUploadMessage('Upload failed');
@@ -100,6 +135,12 @@ export default function Home() {
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">CRUD Items</h1>
+      {rateLimitMessage && (
+        <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4">
+          <p className="font-bold">Rate Limited</p>
+          <p>{rateLimitMessage}</p>
+        </div>
+      )}
       <Card className="mb-4">
         <CardHeader>
           <CardTitle>{editingId ? 'Edit Item' : 'Add Item'}</CardTitle>
