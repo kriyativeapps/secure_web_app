@@ -206,6 +206,12 @@ async def upload_items(request: Request):
 async def download_report(filename: str, request: Request):
     return await proxy_to_backend("GET", f"reports/{filename}", request)
 
+@app.get("/app/ui/test-retry")
+async def test_retry(request: Request):
+    """Test endpoint to demonstrate retry logic by hitting backend's 503 endpoint"""
+    logger.info("Test retry endpoint called - will attempt to call backend 503 endpoint with retries")
+    return await proxy_to_backend("GET", "503", request)
+
 @app.get("/app/ui/health")
 async def health_check():
     """Health check endpoint"""
