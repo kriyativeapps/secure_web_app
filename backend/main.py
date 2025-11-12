@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends, UploadFile, File
+from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Request
 from sqlmodel import Session, select
 from models import Item
 from database import get_session
@@ -6,9 +6,56 @@ from typing import List
 import pandas as pd
 import io
 import os
+from dotenv import load_dotenv, find_dotenv
+import psutil
+import logging
 from datetime import datetime
 
-app = FastAPI()
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+app = FastAPI(title="Backend API", description="Backend API for Secure CRUD Web App")
+
+# Load environment variables
+load_dotenv(find_dotenv())
+
+# Performance thresholds (configurable via environment variables)
+CPU_THRESHOLD = int(os.environ.get('CPU_THRESHOLD', '95'))  # 95%
+MEMORY_THRESHOLD = int(os.environ.get('MEMORY_THRESHOLD', '90'))  # 90%
+
+@app.middleware("http")
+async def cpu_based_rate_limiter(request: Request, call_next):
+    # Get CPU usage. The 'interval' parameter is important.
+    cpu_percent = psutil.cpu_percent(interval=None)
+    
+    # Get memory usage
+    memory_percent = psutil.virtual_memory().percent
+
+    if cpu_percent > CPU_THRESHOLD:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Service Unavailable - CPU usage is at {cpu_percent}%",
+        )
+    
+    if memory_percent > MEMORY_THRESHOLD:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Service Unavailable - Memory usage is at {memory_percent}%",
+        )
+
+    response = await call_next(request)
+    return response
+
+# Test endpoint to return 503 error for testing app-api retry logic
+@app.get("/system/api/v1/503")
+async def test_503_endpoint():
+    """Test endpoint that always returns 503 Service Unavailable"""
+    logger.info("Test endpoint /503 called - returning 503 error")
+    raise HTTPException(
+        status_code=503,
+        detail="Service Unavailable - Test endpoint for retry logic"
+    )
 
 from fastapi.responses import FileResponse
 

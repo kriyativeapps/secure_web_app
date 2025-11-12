@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request, Response, HTTPException
 from fastapi.responses import StreamingResponse, FileResponse
 import httpx
+import httpx_retries
 import os
 import pathlib
 from dotenv import load_dotenv, find_dotenv
@@ -17,18 +18,33 @@ app = FastAPI(title="Application API", description="API Gateway for Secure CRUD 
 # Load environment variables
 load_dotenv(find_dotenv())
 
-# CPU usage threshold for rate limiting
-CPU_THRESHOLD = 80  # 80%
+# Performance thresholds (configurable via environment variables)
+CPU_THRESHOLD = int(os.environ.get('CPU_THRESHOLD', '95'))  # 95%
+MEMORY_THRESHOLD = int(os.environ.get('MEMORY_THRESHOLD', '90'))  # 90%
+
+# HTTP client configuration for backend proxy (configurable via environment variables)
+HTTP_TIMEOUT = float(os.environ.get('HTTP_TIMEOUT', '10.0'))  # 10.0 seconds
+HTTP_RETRIES = int(os.environ.get('HTTP_RETRIES', '3'))  # 3 retries
+HTTP_BACKOFF_FACTOR = float(os.environ.get('HTTP_BACKOFF_FACTOR', '0.5'))  # 0.5 second backoff factor
 
 @app.middleware("http")
 async def cpu_based_rate_limiter(request: Request, call_next):
     # Get CPU usage. The 'interval' parameter is important.
     cpu_percent = psutil.cpu_percent(interval=None)
+    
+    # Get memory usage
+    memory_percent = psutil.virtual_memory().percent
 
     if cpu_percent > CPU_THRESHOLD:
         raise HTTPException(
-            status_code=429,
-            detail=f"Too Many Requests - CPU usage is at {cpu_percent}%",
+            status_code=503,
+            detail=f"Service Unavailable - CPU usage is at {cpu_percent}%",
+        )
+    
+    if memory_percent > MEMORY_THRESHOLD:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Service Unavailable - Memory usage is at {memory_percent}%",
         )
 
     response = await call_next(request)
@@ -49,25 +65,43 @@ def resolve_cert_path(env_var):
         raise FileNotFoundError(f"Certificate file not found: {p}")
     return str(p)
 
-# Configure mTLS client for backend communication
+# Configure mTLS client for backend communication with retry capability
 def get_backend_client():
-    """Create httpx client with mTLS configuration for backend"""
+    """Create httpx client with mTLS configuration and retry capability for backend"""
     import ssl
 
-    client_cert = (resolve_cert_path('CLIENT_CERT'), resolve_cert_path('CLIENT_KEY'))
-    ca_cert = resolve_cert_path('CA_CERT')
+    client_cert_path = resolve_cert_path('CLIENT_CERT')
+    client_key_path = resolve_cert_path('CLIENT_KEY')
+    ca_cert_path = resolve_cert_path('CA_CERT')
 
-    # Create SSL context that trusts our CA but allows localhost
-    ssl_context = ssl.create_default_context()
-    ssl_context.load_cert_chain(client_cert[0], client_cert[1])
-    ssl_context.load_verify_locations(cafile=ca_cert)
-    ssl_context.check_hostname = False  # Allow localhost with self-signed cert
-    ssl_context.verify_mode = ssl.CERT_REQUIRED
-
+    # Create SSL context for mutual TLS with self-signed certificates
+    ssl_context = ssl.create_default_context(cafile=ca_cert_path)
+    ssl_context.load_cert_chain(client_cert_path, client_key_path)
+    
+    # Configure retry policy with exponential backoff (configurable via environment variables)
+    # total=3 means 3 retries (4 total attempts)
+    # backoff_factor=0.5 means delays of 0.5s, 1.0s, 2.0s, 4.0s
+    # status_forcelist specifies which status codes to retry
+    retry = httpx_retries.Retry(
+        total=HTTP_RETRIES,
+        backoff_factor=HTTP_BACKOFF_FACTOR,
+        status_forcelist=[502, 503, 504]
+    )
+    
+    # Create base transport with SSL context
+    base_transport = httpx.AsyncHTTPTransport(verify=ssl_context)
+    
+    # Wrap with retry transport
+    transport = httpx_retries.RetryTransport(
+        retry=retry,
+        transport=base_transport
+    )
+    
+    # Create HTTP client with retry transport
+    # Timeout of 10s per request attempt (configurable)
     return httpx.AsyncClient(
-        cert=client_cert,
-        verify=ssl_context,
-        timeout=30.0
+        transport=transport,
+        timeout=HTTP_TIMEOUT
     )
 
 async def proxy_to_backend(method: str, path: str, request: Request, body=None):
@@ -127,10 +161,10 @@ async def proxy_to_backend(method: str, path: str, request: Request, body=None):
 
         except httpx.TimeoutException as e:
             logger.error(f"Backend timeout: {str(e)}")
-            raise HTTPException(status_code=504, detail="Backend timeout")
+            raise HTTPException(status_code=504, detail=f"Backend timeout: {str(e)}")
         except httpx.ConnectError as e:
             logger.error(f"Backend connection failed: {str(e)}")
-            raise HTTPException(status_code=502, detail="Backend connection failed")
+            raise HTTPException(status_code=502, detail=f"Backend connection failed: {str(e)}")
         except httpx.RequestError as e:
             logger.error(f"Backend request failed: {str(e)}")
             raise HTTPException(status_code=502, detail=f"Backend request failed: {str(e)}")

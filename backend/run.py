@@ -1,4 +1,5 @@
 import uvicorn
+import ssl
 import os
 import pathlib
 from dotenv import load_dotenv, find_dotenv
@@ -24,5 +25,6 @@ if __name__ == "__main__":
         ssl_keyfile=resolve_cert_path('SYSTEM_API_KEY'),
         ssl_certfile=resolve_cert_path('SYSTEM_API_CERT'),
         ssl_ca_certs=resolve_cert_path('CA_CERT'),
+        ssl_cert_reqs=ssl.CERT_REQUIRED,  # Require client certificates
         reload=True,
     )
